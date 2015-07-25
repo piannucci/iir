@@ -1,18 +1,49 @@
+/*
+ * This code is based on the tool by the same name by the late Tony Fisher
+ * <fisher@minster.york.ac.uk>.  More information is available online at
+ * <http://www-users.cs.york.ac.uk/~fisher/mkfilter/>.
+ *
+ * I wish I could say that the license status of that code was clear.  So far
+ * as I can tell, however, it is not.  The code is listed as "Freely Available
+ * Software", and elsewhere as "freely available for down-loading via the WWW."
+ * The copyright notice below applies only to my modifications, but I will
+ * update this file if more information becomes available.
+ *
+ * -Peter Iannucci <iannucci@mit.edu>
+ *
+ ******************************************************************************
+ *
+ * Modified to build as a C extension for the Python interpreter.
+ *
+ * The MIT License (MIT)
+ * 
+ * Copyright (c) 2015 Peter Iannucci
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
+ * THE SOFTWARE.
+ */
+
 #include <Python.h>
 #include <complex>
-#include <vector>
-#include <string>
-#include <stdint.h>
-#include <iostream>
-#include <cmath>
-#include <cstdlib>
-#include <cstring>
 
 #define EPS         1e-10
 #define MAXORDER    10
 #define MAXPZ       512
-
-typedef std::complex<double> dcomplex;
 
 static void mkfilter(PyObject *args, int &order_out, double alpha_out[], double beta_out[], double &gamma_out);
 
@@ -72,6 +103,8 @@ PyMODINIT_FUNC initmkfilter(void)
 #define opt_w  0x04000  /* -w   don't pre-warp                 */
 #define opt_z  0x08000  /* -z   use matched z-transform        */
 #define opt_Z  0x10000  /* -Z   additional zero                */
+
+typedef std::complex<double> dcomplex;
 
 template <class T> static inline T sqr(T z) { return z*z; }
 static inline bool onebit(unsigned int m) { return (m != 0) && ((m & m-1) == 0); }
