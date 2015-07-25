@@ -80,10 +80,10 @@ class ContinuousIIRFilter(object):
         other.order = self.order
         return other
 
-def mkfilter(method, type, order, alpha, continuous=False, dtype=None):
+def MkFilter(method, type, order, alpha, continuous=False, dtype=None):
     if not isinstance(alpha, (tuple, list)):
         alpha = (alpha,)
-    args = ('-%s' % method).split(' ') + ['-%s' % type, '-o', str(order), '-l', '-a'] + [str(a) for a in alpha]
+    args = ('-%s' % method).split(' ') + ['-%s' % type, '-o', order, '-a'] + list(alpha)
     order, alpha, beta, gamma = mkfilter.mkfilter(*args)
     if not continuous:
         return IIRFilter(order, alpha, beta, gamma)
@@ -91,7 +91,7 @@ def mkfilter(method, type, order, alpha, continuous=False, dtype=None):
         return ContinuousIIRFilter(order, alpha, beta, gamma, dtype)
 
 def lowpass(freq, order=6, method='Bu', continuous=False, dtype=None):
-    return mkfilter(method, 'Lp', order, freq, continuous, dtype)
+    return MkFilter(method, 'Lp', order, freq, continuous, dtype)
 
 def highpass(freq, order=6, method='Bu', continuous=False, dtype=None):
-    return mkfilter(method, 'Hp', order, freq, continuous, dtype)
+    return MkFilter(method, 'Hp', order, freq, continuous, dtype)

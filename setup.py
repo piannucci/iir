@@ -9,5 +9,5 @@ setup(name='IIR',
       author_email='iannucci@mit.edu',
       url='',
       packages=['iir'],
-      ext_modules=[Extension('mkfilter', ['src/mkfilter.cc'])],
+      ext_modules=[Extension('iir.mkfilter', ['src/mkfilter.cc'])],
       )

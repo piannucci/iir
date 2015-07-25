@@ -14,33 +14,22 @@
 
 typedef std::complex<double> dcomplex;
 
-static void mkfilter(const char *argv[], int &order_out, double alpha_out[], double beta_out[], double &gamma_out);
+static void mkfilter(PyObject *args, int &order_out, double alpha_out[], double beta_out[], double &gamma_out);
 
 static PyObject *
 mkfilter_mkfilter(PyObject *self, PyObject *args)
 {
-    Py_ssize_t argc = PyTuple_Size(args);
-    const char *argv[argc+1];
-    for (Py_ssize_t i=0; i<argc; i++)
-    {
-        PyObject *value = PyTuple_GetItem(args, i);
-        if (!PyString_Check(value))
-        {
-            PyErr_SetString(PyExc_TypeError, "All arguments must be strings");
-            return NULL;
-        }
-        argv[i] = PyString_AsString(value);
-    }
-    argv[argc] = NULL;
-
     int order = 0;
     double alpha[MAXPZ], beta[MAXPZ], gamma;
     try {
-        mkfilter(argv, order, alpha, beta, gamma);
+        mkfilter(args, order, alpha, beta, gamma);
     } catch (const char *s) {
         PyErr_SetString(PyExc_ValueError, s);
         return NULL;
     }
+
+    if (PyErr_Occurred())
+        return NULL;
 
     PyObject *alphaList = PyTuple_New(order+1);
     PyObject *betaList = PyTuple_New(order);
@@ -85,7 +74,6 @@ PyMODINIT_FUNC initmkfilter(void)
 #define opt_Z  0x10000  /* -Z   additional zero                */
 
 template <class T> static inline T sqr(T z) { return z*z; }
-static inline bool seq(const char *s1, const char *s2) { return strcmp(s1,s2) == 0; }
 static inline bool onebit(unsigned int m) { return (m != 0) && ((m & m-1) == 0); }
 static inline dcomplex expj(double theta) { return exp(dcomplex(0, theta)); }
 
@@ -132,11 +120,8 @@ static dcomplex bessel_poles[] =
     dcomplex(-1.36069227838e+00, 1.73350574267e+00), dcomplex(-8.65756901707e-01, 2.29260483098e+00),
 };
 
-static void readcmdline(const char*[]);
+static void readcmdline(PyObject *);
 static unsigned int decodeoptions(const char*), optbit(const char);
-static double getfarg(const char*);
-static int getiarg(const char*);
-static void usage();
 static void checkoptions();
 static void setdefaults();
 static void compute_s(), choosepole(dcomplex), prewarp(), normalize(), compute_z_blt();
@@ -147,7 +132,7 @@ static dcomplex reflect(dcomplex);
 static void compute_bpres(), add_extra_zero();
 static void expandpoly(), expand(dcomplex[], int, dcomplex[]), multin(dcomplex, int, dcomplex[]);
 
-static void mkfilter(const char *argv[], int &order_out, double alpha_out[], double beta_out[], double &gamma_out)
+static void mkfilter(PyObject *args, int &order_out, double alpha_out[], double beta_out[], double &gamma_out)
 {
     splane = zplane = (pzrep){};
     raw_alpha1 = raw_alpha2 = raw_alphaz = 0;
@@ -155,7 +140,9 @@ static void mkfilter(const char *argv[], int &order_out, double alpha_out[], dou
     warped_alpha1 = warped_alpha2 = chebrip = qfactor = 0;
     infq = 0;
 
-    readcmdline(argv);
+    readcmdline(args);
+    if (PyErr_Occurred())
+        return;
     checkoptions();
     setdefaults();
 
@@ -199,61 +186,114 @@ static void mkfilter(const char *argv[], int &order_out, double alpha_out[], dou
     gamma_out = 1./std::abs(gain);
 }
 
-static void readcmdline(const char *argv[])
+static void readcmdline(PyObject *args)
 {
+    Py_ssize_t argc = PyTuple_Size(args);
+
     options = order = polemask = 0;
-    int ap = 0;
-    while (argv[ap] != NULL)
+    Py_ssize_t ap = 0;
+    while (ap < argc)
     {
-        unsigned int m = decodeoptions(argv[ap++]);
-        if (m & opt_ch) chebrip = getfarg(argv[ap++]);
+        PyObject *value = PyTuple_GetItem(args, ap++);
+        if (!PyString_Check(value))
+            throw "Option names must be strings";
+        unsigned int m = decodeoptions(PyString_AsString(value));
+
+        if (m & opt_ch)
+        {
+            if (ap < argc)
+                chebrip = PyFloat_AsDouble(PyTuple_GetItem(args, ap++));
+            else
+                throw "-Ch option requires a numeric argument";
+        }
         if (m & opt_a)
         {
-            raw_alpha1 = getfarg(argv[ap++]);
-            raw_alpha2 = (argv[ap] != NULL && argv[ap][0] != '-') ? getfarg(argv[ap++]) : raw_alpha1;
+            if (ap < argc)
+                raw_alpha1 = raw_alpha2 = PyFloat_AsDouble(PyTuple_GetItem(args, ap++));
+            else
+                throw "-a option requires a numeric argument";
+            if (ap < argc)
+            {
+                value = PyTuple_GetItem(args, ap);
+                if (!PyString_Check(value) || PyString_AsString(value)[0] != '-')
+                {
+                    raw_alpha2 = PyFloat_AsDouble(value);
+                    ap++;
+                }
+            }
         }
-        if (m & opt_Z) raw_alphaz = getfarg(argv[ap++]);
-        if (m & opt_o) order = getiarg(argv[ap++]);
+        if (m & opt_Z)
+        {
+            if (ap < argc)
+                raw_alphaz = PyFloat_AsDouble(PyTuple_GetItem(args, ap++));
+            else
+                throw "-Z option requires a numeric argument";
+        }
+        if (m & opt_o)
+        {
+            if (ap < argc)
+                order = PyInt_AsLong(PyTuple_GetItem(args, ap++));
+            else
+                throw "-o option requires a numeric argument";
+        }
         if (m & opt_p)
         {
-            while (argv[ap] != NULL && argv[ap][0] >= '0' && argv[ap][0] <= '9')
+            while (ap < argc)
             {
-                int p = atoi(argv[ap++]);
+                value = PyTuple_GetItem(args, ap);
+                if (PyString_Check(value) && PyString_AsString(value)[0] == '-')
+                    break;
+                int p = PyInt_AsLong(value);
                 if (p < 0 || p > 31) p = 31; /* out-of-range value will be picked up later */
                 polemask |= (1 << p);
+                ap++;
+                if (PyErr_Occurred())
+                    break;
             }
         }
         if (m & opt_re)
         {
-            const char *s = argv[ap++];
-            if (s != NULL && seq(s,"Inf")) infq = true;
-            else {
-                qfactor = getfarg(s); infq = false; }
+            if (ap < argc)
+            {
+                value = PyTuple_GetItem(args, ap++);
+                if (PyString_Check(value) && strcmp(PyString_AsString(value), "Inf") == 0)
+                    infq = true;
+                else
+                {
+                    qfactor = PyFloat_AsDouble(value);
+                    infq = false;
+                }
+            }
+            else
+                throw "-Re option requires an argument";
         }
         options |= m;
+        if (PyErr_Occurred())
+            return;
     }
 }
 
 static unsigned int decodeoptions(const char *s)
 {
-    if (*(s++) != '-') usage();
+    if (*(s++) != '-') throw "Options must begin with '-'";
     unsigned int m = 0;
-    if (seq(s,"Be")) m |= opt_be;
-    else if (seq(s,"Bu")) m |= opt_bu;
-    else if (seq(s, "Ch")) m |= opt_ch;
-    else if (seq(s, "Re")) m |= opt_re;
-    else if (seq(s, "Pi")) m |= opt_pi;
-    else if (seq(s, "Lp")) m |= opt_lp;
-    else if (seq(s, "Hp")) m |= opt_hp;
-    else if (seq(s, "Bp")) m |= opt_bp;
-    else if (seq(s, "Bs")) m |= opt_bs;
-    else if (seq(s, "Ap")) m |= opt_ap;
+    if      (strcmp(s, "Be") == 0) m |= opt_be;
+    else if (strcmp(s, "Bu") == 0) m |= opt_bu;
+    else if (strcmp(s, "Ch") == 0) m |= opt_ch;
+    else if (strcmp(s, "Re") == 0) m |= opt_re;
+    else if (strcmp(s, "Pi") == 0) m |= opt_pi;
+    else if (strcmp(s, "Lp") == 0) m |= opt_lp;
+    else if (strcmp(s, "Hp") == 0) m |= opt_hp;
+    else if (strcmp(s, "Bp") == 0) m |= opt_bp;
+    else if (strcmp(s, "Bs") == 0) m |= opt_bs;
+    else if (strcmp(s, "Ap") == 0) m |= opt_ap;
     else
     {
         while (*s != '\0')
         {
             unsigned int bit = optbit(*(s++));
-            if (bit == 0) usage();
+            if (bit == 0)
+                throw "Unrecognized option";
             m |= bit;
         }
     }
@@ -275,52 +315,36 @@ static unsigned int optbit(char c)
     }
 }
 
-static void usage() {
-    throw "mkfilter: bad options; consult usage";
-}
-
-static double getfarg(const char *s)
-{
-    if (s == NULL) usage();
-    return atof(s);
-}
-
-static int getiarg(const char *s)
-{
-    if (s == NULL) usage();
-    return atoi(s);
-}
-
 static void checkoptions()
 {
     if (!onebit(options & (opt_be | opt_bu | opt_ch | opt_re | opt_pi)))
-        throw "mkfilter: must specify exactly one of -Be, -Bu, -Ch, -Re, -Pi";
+        throw "must specify exactly one of -Be, -Bu, -Ch, -Re, -Pi";
     if (options & opt_re)
     {
         if (!onebit(options & (opt_bp | opt_bs | opt_ap)))
-            throw "mkfilter: must specify exactly one of -Bp, -Bs, -Ap with -Re";
+            throw "must specify exactly one of -Bp, -Bs, -Ap with -Re";
         if (options & (opt_lp | opt_hp | opt_o | opt_p | opt_w | opt_z))
-            throw "mkfilter: can't use -Lp, -Hp, -o, -p, -w, -z with -Re";
+            throw "can't use -Lp, -Hp, -o, -p, -w, -z with -Re";
     }
     else if (options & opt_pi)
     {
         if (options & (opt_lp | opt_hp | opt_bp | opt_bs | opt_ap))
-            throw "mkfilter: -Lp, -Hp, -Bp, -Bs, -Ap illegal in conjunction with -Pi";
-        if (!(options & opt_o) || (order != 1)) throw "mkfilter: -Pi implies -o 1";
+            throw "-Lp, -Hp, -Bp, -Bs, -Ap illegal in conjunction with -Pi";
+        if (!(options & opt_o) || (order != 1)) throw "-Pi implies -o 1";
     }
     else
     {
         if (!onebit(options & (opt_lp | opt_hp | opt_bp | opt_bs)))
-            throw "mkfilter: must specify exactly one of -Lp, -Hp, -Bp, -Bs";
-        if (options & opt_ap) throw "mkfilter: -Ap implies -Re";
+            throw "must specify exactly one of -Lp, -Hp, -Bp, -Bs";
+        if (options & opt_ap) throw "-Ap implies -Re";
         if (options & opt_o)
         {
-            if (order < 1 || order > MAXORDER) throw "mkfilter: order must be in range 1 .. MAXORDER";
+            if (order < 1 || order > MAXORDER) throw "order must be in range 1 .. MAXORDER";
             if (options & opt_p)
             {
                 unsigned int m = (1 << order) - 1; /* "order" bits set */
                 if ((polemask & ~m) != 0)
-                    throw "mkfilter: args to -p must be in range 0 .. order-1";
+                    throw "args to -p must be in range 0 .. order-1";
             }
         }
         else throw "must specify -o";
@@ -363,14 +387,14 @@ static void compute_s() /* compute S-plane poles for prototype LP filter */
         /* modify for Chebyshev (p. 136 DeFatta et al.) */
         if (chebrip >= 0.0)
         {
-            throw "mkfilter: Chebyshev ripple must be < 0.0";
+            throw "Chebyshev ripple must be < 0.0";
         }
         double rip = pow(10.0, -chebrip / 10.0);
         double eps = sqrt(rip - 1.0);
         double y = asinh(1.0 / eps) / (double) order;
         if (y <= 0.0)
         {
-            throw "mkfilter: bug: Chebyshev y must be > 0.0";
+            throw "bug: Chebyshev y must be > 0.0";
         }
         double sh = sinh(y);
         double ch = cosh(y);
@@ -541,17 +565,14 @@ static void compute_bpres()
             if (fabs(phi) < EPS) cvg = true;
             thm = 0.5 * (th1+th2);
         }
-        if (!cvg) fprintf(stderr, "mkfilter: warning: failed to converge\n");
+        if (!cvg) fprintf(stderr, "warning: failed to converge");
     }
 }
 
 static void add_extra_zero()
 {
     if (zplane.numzeros+2 > MAXPZ)
-    {
-        fprintf(stderr, "mkfilter: too many zeros; can't do -Z\n");
-        exit(1);
-    }
+        throw "too many zeros; can't do -Z";
     double theta = 2.0 * M_PI * raw_alphaz;
     dcomplex zz = expj(theta);
     zplane.zeros[zplane.numzeros++] = zz;
@@ -583,10 +604,7 @@ static void expand(dcomplex pz[], int npz, dcomplex coeffs[])
     for (i=0; i < npz+1; i++)
     {
         if (fabs(coeffs[i].imag()) > EPS)
-        {
-            fprintf(stderr, "mkfilter: coeff of z^%d is not real; poles/zeros are not complex conjugates\n", i);
-            exit(1);
-        }
+            throw "coeff is not real; poles/zeros are not complex conjugates";
     }
 }
 
