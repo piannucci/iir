@@ -10,4 +10,5 @@ setup(name='IIR',
       url='',
       packages=['iir'],
       ext_modules=[Extension('iir.mkfilter', ['src/mkfilter.cc'])],
+      requires=['numpy', 'scipy'],
       )
