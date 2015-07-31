@@ -74,14 +74,59 @@ mkfilter_mkfilter(PyObject *self, PyObject *args)
     return Py_BuildValue("iNNd", order, alphaList, betaList, gamma);
 }
 
-static PyMethodDef MkfilterMethods[] = {
+static PyMethodDef mkfilter_methods[] = {
     {"mkfilter",  mkfilter_mkfilter, METH_VARARGS, "Designs a filter."},
     {NULL, NULL, 0, NULL}
 };
 
-PyMODINIT_FUNC initmkfilter(void)
+#if PY_MAJOR_VERSION >= 3
+
+static int mkfilter_traverse(PyObject *m, visitproc visit, void *arg) {
+    return 0;
+}
+
+static int mkfilter_clear(PyObject *m) {
+    return 0;
+}
+
+static struct PyModuleDef moduledef = {
+        PyModuleDef_HEAD_INIT,
+        "mkfilter", NULL,
+        0,
+        mkfilter_methods,
+        NULL,
+        mkfilter_traverse,
+        mkfilter_clear,
+        NULL
+};
+
+#define ASSTRING PyUnicode_AsUTF8
+#define ISSTRING PyUnicode_Check
+
+#define INITERROR return NULL
+
+extern "C"
+PyObject * PyInit_mkfilter(void)
+
+#else
+
+#define ASSTRING PyString_AsString
+#define ISSTRING PyString_Check
+
+#define INITERROR return
+
+extern "C"
+void initmkfilter(void)
+
+#endif
 {
-    Py_InitModule("mkfilter", MkfilterMethods);
+#if PY_MAJOR_VERSION >= 3
+    PyObject *module = PyModule_Create(&moduledef);
+    return module;
+#else
+    PyObject *module = Py_InitModule("mkfilter", mkfilter_methods);
+    (void)module;
+#endif
 }
 
 #define opt_be 0x00001  /* -Be  Bessel characteristic          */
@@ -228,9 +273,9 @@ static void readcmdline(PyObject *args)
     while (ap < argc)
     {
         PyObject *value = PyTuple_GetItem(args, ap++);
-        if (!PyString_Check(value))
+        if (!ISSTRING(value))
             throw "Option names must be strings";
-        unsigned int m = decodeoptions(PyString_AsString(value));
+        unsigned int m = decodeoptions(ASSTRING(value));
 
         if (m & opt_ch)
         {
@@ -248,7 +293,7 @@ static void readcmdline(PyObject *args)
             if (ap < argc)
             {
                 value = PyTuple_GetItem(args, ap);
-                if (!PyString_Check(value) || PyString_AsString(value)[0] != '-')
+                if (!ISSTRING(value) || ASSTRING(value)[0] != '-')
                 {
                     raw_alpha2 = PyFloat_AsDouble(value);
                     ap++;
@@ -265,7 +310,7 @@ static void readcmdline(PyObject *args)
         if (m & opt_o)
         {
             if (ap < argc)
-                order = PyInt_AsLong(PyTuple_GetItem(args, ap++));
+                order = PyLong_AsLong(PyTuple_GetItem(args, ap++));
             else
                 throw "-o option requires a numeric argument";
         }
@@ -274,9 +319,9 @@ static void readcmdline(PyObject *args)
             while (ap < argc)
             {
                 value = PyTuple_GetItem(args, ap);
-                if (PyString_Check(value) && PyString_AsString(value)[0] == '-')
+                if (ISSTRING(value) && ASSTRING(value)[0] == '-')
                     break;
-                int p = PyInt_AsLong(value);
+                int p = PyLong_AsLong(value);
                 if (p < 0 || p > 31) p = 31; /* out-of-range value will be picked up later */
                 polemask |= (1 << p);
                 ap++;
@@ -289,7 +334,7 @@ static void readcmdline(PyObject *args)
             if (ap < argc)
             {
                 value = PyTuple_GetItem(args, ap++);
-                if (PyString_Check(value) && strcmp(PyString_AsString(value), "Inf") == 0)
+                if (ISSTRING(value) && strcmp(ASSTRING(value), "Inf") == 0)
                     infq = true;
                 else
                 {
