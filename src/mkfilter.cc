@@ -3,39 +3,16 @@
  * <fisher@minster.york.ac.uk>.  More information is available online at
  * <http://www-users.cs.york.ac.uk/~fisher/mkfilter/>.
  *
- * I wish I could say that the license status of that code was clear.  So far
- * as I can tell, however, it is not.  The code is listed as "Freely Available
- * Software", and elsewhere as "freely available for down-loading via the WWW."
- * The copyright notice below applies only to my modifications, but I will
- * update this file if more information becomes available.
- *
- * -Peter Iannucci <iannucci@mit.edu>
+ * Copyright (c) 2003 University of York. You are free to use the source code
+ * for academic research purposes only.  Any relevant source code or header
+ * files must acknowledge Dr A.  Fisher and the University of York.
  *
  ******************************************************************************
  *
- * Modified to build as a C extension for the Python interpreter.
+ * Modified to build as a C extension for the Python interpreter in 2015 by
+ * Peter Iannucci; my changes are in the public domain (but the original work
+ * and the combination are not due to the above).
  *
- * The MIT License (MIT)
- * 
- * Copyright (c) 2015 Peter Iannucci
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- * 
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- * 
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
  */
 
 #include <Python.h>
